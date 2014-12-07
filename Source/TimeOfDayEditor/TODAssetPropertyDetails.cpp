@@ -22,42 +22,116 @@ float FTODFloatCurveProperty::GetCurrentFloatValue() const
 	return 0;
 }
 
+FReply FTODFloatCurveProperty::HandleOnButtonClicked(TSharedPtr<IPropertyHandle> PropertyHandle)
+{
+	if (OnPropertySelected.IsBound())
+	{
+		if (PropertyHandle.IsValid())
+		{
+			FName test = PropertyHandle->GetProperty()->GetFName();
+			OnPropertySelected.Execute(PropertyHandle->GetProperty());
+		}
+	}
+	return FReply::Unhandled();
+}
 float FTODFloatCurveProperty::GetFloatValueFromAttribute() const
 {
 	return GetFloatAttribute.Get();
 }
 void FTODFloatCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBuilder)
 {
-	
 	CategoryBuilder.AddCustomRow(FString("Test Row"))
 		[
-			SNew(SProperty, PropertyHandle)
-			.CustomWidget()
+			SNew(SButton)
+			.OnClicked(this, &FTODFloatCurveProperty::HandleOnButtonClicked, PropertyHandle)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot()
+				SNew(SProperty, PropertyHandle)
+				.CustomWidget()
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot()
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
 					[
-						SNew(STextBlock)
-						.Text(FText::FromString(PropertyHandle->GetPropertyDisplayName()))
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+							[
+								SNew(SSpinBox<float>)
+								.MinSliderValue(0)
+								.MaxSliderValue(1024)
+								.Value(TAttribute<float>(this, &FTODFloatCurveProperty::GetFloatValueFromAttribute))
+							]
 					]
-					+ SVerticalBox::Slot()
-						[
-							SNew(SSpinBox<float>)
-							.MinSliderValue(0)
-							.MaxSliderValue(1024)
-							.Value(TAttribute<float>(this, &FTODFloatCurveProperty::GetFloatValueFromAttribute))
-						]
 				]
-
 			]
 		];
 }
-TSharedRef<IDetailCustomization> FTODAssetPropertyDetails::MakeInstance()
+
+
+FLinearColor FTODColorCurveProperty::GetCurrentColorValue() const
 {
-	return MakeShareable(new FTODAssetPropertyDetails());
+	if (PropertyHandle.IsValid())
+	{
+		UProperty* propPtr = PropertyHandle->GetProperty();
+		UStructProperty* structProp = Cast<UStructProperty>(propPtr);
+		if (structProp)
+		{
+			FRuntimeCurveLinearColor* colorCurve = structProp->ContainerPtrToValuePtr<FRuntimeCurveLinearColor>(TODAsset);
+			if (colorCurve)
+			{
+				return colorCurve->GetLinearColorValue(TODAsset->Hour);
+			}
+		}
+	}
+	return FLinearColor(0,0,0,0);
+}
+
+FReply FTODColorCurveProperty::HandleOnButtonClicked(TSharedPtr<IPropertyHandle> PropertyHandle)
+{
+	if (OnPropertySelected.IsBound())
+	{
+		if (PropertyHandle.IsValid())
+		{
+			FName test = PropertyHandle->GetProperty()->GetFName();
+			OnPropertySelected.Execute(PropertyHandle->GetProperty());
+		}
+	}
+	return FReply::Unhandled();
+}
+FLinearColor FTODColorCurveProperty::GetColorValueFromAttribute() const
+{
+	return GetColorAttribute.Get();
+}
+void FTODColorCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBuilder)
+{
+	CategoryBuilder.AddCustomRow(FString("Test Row"))
+		[
+			SNew(SButton)
+			.OnClicked(this, &FTODColorCurveProperty::HandleOnButtonClicked, PropertyHandle)
+			[
+				SNew(SProperty, PropertyHandle)
+				.CustomWidget()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot()
+						[
+							SNew(SColorBlock)
+							.UseSRGB(true)
+							.ColorIsHSV(false)
+							.Color(TAttribute<FLinearColor>(this, &FTODColorCurveProperty::GetColorValueFromAttribute))
+						]
+					]
+				]
+			]
+		];
+}
+
+
+
+TSharedRef<IDetailCustomization> FTODAssetPropertyDetails::MakeInstance(FTODOnPropertySelected OnPropertySelectedIn)
+{
+	return MakeShareable(new FTODAssetPropertyDetails(OnPropertySelectedIn));
 }
 
 FTODAssetPropertyDetails::~FTODAssetPropertyDetails()
@@ -93,13 +167,34 @@ void FTODAssetPropertyDetails::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 			if (structProp)
 			{
 				FRuntimeFloatCurve* floatCurve = structProp->ContainerPtrToValuePtr<FRuntimeFloatCurve>(TODAsset);
-				if (floatCurve)
+				if (floatCurve && floatCurve->IsOfType(FRuntimeFloatCurve::CurveTypeID))
 				{
 					TSharedPtr<FTODFloatCurveProperty> tempFloatProp = MakeShareable(new FTODFloatCurveProperty());
+					tempFloatProp->OnPropertySelected = OnPropertySelected;
 					tempFloatProp->PropertyHandle = DetailLayout.GetProperty(prop->GetFName());
 					tempFloatProp->TODAsset = TODAsset;
 					tempFloatProp->CategoryName = tempFloatProp->PropertyHandle->GetMetaData(TEXT("Category"));
 					FloatCurves.Add(tempFloatProp);
+				}
+			}
+		}
+		for (TFieldIterator<UProperty> PropIt(TODAsset->GetClass()); PropIt; ++PropIt)
+		{
+			UProperty* prop = *PropIt;
+			DetailLayout.HideProperty(prop->GetFName());
+			//PropertyHandles.Add(DetailLayout.GetProperty(prop->GetFName()));
+			UStructProperty* structProp = Cast<UStructProperty>(prop);
+			if (structProp)
+			{
+				FRuntimeCurveLinearColor* colorCurve = structProp->ContainerPtrToValuePtr<FRuntimeCurveLinearColor>(TODAsset);
+				if (colorCurve && colorCurve->IsOfType(FRuntimeCurveLinearColor::CurveTypeID))
+				{
+					TSharedPtr<FTODColorCurveProperty> tempColorProp = MakeShareable(new FTODColorCurveProperty());
+					tempColorProp->OnPropertySelected = OnPropertySelected;
+					tempColorProp->PropertyHandle = DetailLayout.GetProperty(prop->GetFName());
+					tempColorProp->TODAsset = TODAsset;
+					tempColorProp->CategoryName = tempColorProp->PropertyHandle->GetMetaData(TEXT("Category"));
+					ColorCurves.Add(tempColorProp);
 				}
 			}
 
@@ -120,6 +215,9 @@ void FTODAssetPropertyDetails::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 	IDetailCategoryBuilder& PPCategoryBuilder = DetailLayout.EditCategory("Post Process");
 	IDetailCategoryBuilder& SkyLightCategoryBuilder = DetailLayout.EditCategory("SkyLight");
 	IDetailCategoryBuilder& MoonCategoryBuilder = DetailLayout.EditCategory("Moon");
+
+	//probabaly not he best way around, but it works pretty nice.
+	//and it's not like we will be reconstructing it every second in anyway.
 	for (TSharedPtr<FTODFloatCurveProperty> floatCurves : FloatCurves)
 	{
 		if (floatCurves->CategoryName == FString("Sun"))
@@ -140,8 +238,29 @@ void FTODAssetPropertyDetails::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 		if (floatCurves->CategoryName == FString("Moon"))
 			floatCurves->ConstructWidget(MoonCategoryBuilder);
 	}
-}
 
+	for (TSharedPtr<FTODColorCurveProperty> colorCurves : ColorCurves)
+	{
+		if (colorCurves->CategoryName == FString("Sun"))
+			colorCurves->ConstructWidget(SunCategoryBuilder);
+
+		if (colorCurves->CategoryName == FString("Atmospheric Fog"))
+			colorCurves->ConstructWidget(AFCategoryBuilder);
+
+		if (colorCurves->CategoryName == FString("Height Fog"))
+			colorCurves->ConstructWidget(HFCategoryBuilder);
+
+		if (colorCurves->CategoryName == FString("Post Process"))
+			colorCurves->ConstructWidget(PPCategoryBuilder);
+
+		if (colorCurves->CategoryName == FString("SkyLight"))
+			colorCurves->ConstructWidget(SkyLightCategoryBuilder);
+
+		if (colorCurves->CategoryName == FString("Moon"))
+			colorCurves->ConstructWidget(MoonCategoryBuilder);
+	}
+}
+//accept propetty name ?
 float FTODAssetPropertyDetails::GetCurrentFloatValue() const
 {
 	if (SunIntensityCurve.IsValid())

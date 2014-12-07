@@ -83,10 +83,12 @@ protected:
 	//Null them everytime value of any of them change.
 	FRuntimeFloatCurve* SelectedFloatCurve;
 	FRuntimeCurveLinearColor* SelectedColorCurve;
-
+	
+	FName SelectedCurveName;
+	FText GetCurrentCurveName() const;
 	FName GetCurrentProperty();
 
-	void SetCurveToEdit();
+	void SetCurveToEdit(UProperty* CurveProp);
 private:
 	/**	The tab id for the curve table tab */
 	static const FName TODEditorTabId;

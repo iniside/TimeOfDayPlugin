@@ -11,15 +11,15 @@
 	"Category" : "Time Of Day",
 	"EnabledByDefault" : true,
 
-	"Modules" :
-	[
+    "Modules": [
         {
             "Name": "TimeOfDay",
             "Type": "Runtime"
         },
         {
-			"Name" : "TimeOfDayEditor",
-			"Type" : "Editor"
-		}
-	]
+            "Name": "TimeOfDayEditor",
+            "Type": "Editor"
+        }
+    ],
+    "CanContainContent" : true
 }

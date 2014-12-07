@@ -56,6 +56,12 @@ void FTODAssetEditor::InitiItemEditor(const EToolkitMode::Type Mode, const TShar
 	EditedItemAsset = ItemIn;
 	SelectedFloatCurve = nullptr;
 	SelectedColorCurve = nullptr;
+
+	/*
+		Once cruve at time can be selected.
+		Select curve on property click.
+	*/
+
 	//SelectedColorCurve = &EditedItemAsset->SunColorCurve;
 	SelectedFloatCurve = &EditedItemAsset->SunIntensityCurve;
 	const bool bIsUpdatable = true;
@@ -72,6 +78,13 @@ void FTODAssetEditor::InitiItemEditor(const EToolkitMode::Type Mode, const TShar
 	//FOnGetCurrentItemIndex OnGetCurrentItemIndex = FOnGetCurrentItemIndex::CreateSP(this, &FARItemEditor::GetCurrentIndex);
 	//FOnGetDetailCustomizationInstance LayoutVariableDetails = FOnGetDetailCustomizationInstance::CreateStatic(&FARItemAssetDetails::MakeInstance, OnGetCurrentItemIndex);
 	
+	//Propety Button Clicked -> Run This function, Profit ?
+	//SetCurveToEdit(FName CurveName)
+
+	FTODOnPropertySelected OnPropertySelected = FTODOnPropertySelected::CreateSP(this, &FTODAssetEditor::SetCurveToEdit);
+
+	FTODOnGetSelectedFloatCurveName OnGetSelectedFloatCurveName;
+
 	FOnGetCurrentProperty OnGetCurrentProperty = FOnGetCurrentProperty::CreateSP(this, &FTODAssetEditor::GetCurrentProperty);
 	
 	FOnGetDetailCustomizationInstance LayoutVariableDetails = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetDetails::MakeInstance, OnGetCurrentProperty);
@@ -79,14 +92,11 @@ void FTODAssetEditor::InitiItemEditor(const EToolkitMode::Type Mode, const TShar
 	ItemDetailsView->SetObject(ItemIn);
 
 	PropertyDetailsView = PropertyEditorModule.CreateDetailView(DetailViewArgs);
-	FOnGetDetailCustomizationInstance PropertyDetailsLayoutView = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetPropertyDetails::MakeInstance);
+	FOnGetDetailCustomizationInstance PropertyDetailsLayoutView = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetPropertyDetails::MakeInstance, OnPropertySelected);
 	PropertyDetailsView->RegisterInstancedCustomPropertyLayout(UTODAsset::StaticClass(), PropertyDetailsLayoutView);
 	PropertyDetailsView->SetObject(ItemIn);
 	
 	
-
-	//ItemDetailsView->OnFinishedChangingProperties().AddRaw(this, &FARItemEditor::SaveEditedPRoperties);
-
 	const TSharedRef<FTabManager::FLayout> TimeOfDayEditorDefault = FTabManager::NewLayout("Standalone_ItemEditor")
 		->AddArea
 		(
@@ -268,15 +278,40 @@ bool FTODAssetEditor::HasAnyAlphaKeys() const
 }
 /* FCurveOwnerInterface End **/
 
-void FTODAssetEditor::SetCurveToEdit()
+void FTODAssetEditor::SetCurveToEdit(UProperty* CurveProp)
 {
-	//reset pointers
+	//reset pointers coz, we can have only one curve active at time.
+
 	SelectedFloatCurve = nullptr;
 	SelectedColorCurve = nullptr;
-
-	if (CurveEditorWidget.IsValid())
+	if (CurveProp)
 	{
-		CurveEditorWidget->SetCurveOwner(this, true);
+		SelectedCurveName = CurveProp->GetFName();
+		UStructProperty* structProp = Cast<UStructProperty>(CurveProp);
+		if (structProp)
+		{
+			FRuntimeFloatCurve* floatCurve = structProp->ContainerPtrToValuePtr<FRuntimeFloatCurve>(EditedItemAsset);
+			if (floatCurve && floatCurve->IsOfType(FRuntimeFloatCurve::CurveTypeID))
+			{
+				SelectedFloatCurve = floatCurve;
+				if (CurveEditorWidget.IsValid())
+				{
+					CurveEditorWidget->SetCurveOwner(this, true);
+				}
+				return;
+			}
+
+			FRuntimeCurveLinearColor* colorCurve = structProp->ContainerPtrToValuePtr<FRuntimeCurveLinearColor>(EditedItemAsset);
+			if (colorCurve && colorCurve->IsOfType(FRuntimeCurveLinearColor::CurveTypeID))
+			{
+				SelectedColorCurve = colorCurve;
+				if (CurveEditorWidget.IsValid())
+				{
+					CurveEditorWidget->SetCurveOwner(this, true);
+				}
+				return;
+			}
+		}
 	}
 }
 
@@ -293,7 +328,10 @@ TSharedRef<SDockTab> FTODAssetEditor::SpawnTab_Item(const FSpawnTabArgs& Args)
 			]
 		];
 }
-
+FText FTODAssetEditor::GetCurrentCurveName() const
+{
+	return FText::FromName(SelectedCurveName);
+}
 TSharedRef<SDockTab> FTODAssetEditor::SpawnTab_Details(const FSpawnTabArgs& Args)
 {
 	check(Args.GetTabId().TabType == TODEditorTabDetails);
@@ -303,6 +341,13 @@ TSharedRef<SDockTab> FTODAssetEditor::SpawnTab_Details(const FSpawnTabArgs& Args
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(STextBlock)
+				.Text(this, &FTODAssetEditor::GetCurrentCurveName)
+			]
+			+ SVerticalBox::Slot()
+				.FillHeight(0.8f)
 			[
 				SAssignNew(CurveEditorWidget, SCurveEditor)
 				.AlwaysDisplayColorCurves(true)
