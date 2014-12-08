@@ -81,22 +81,26 @@ void FTODAssetEditor::InitiItemEditor(const EToolkitMode::Type Mode, const TShar
 	//Propety Button Clicked -> Run This function, Profit ?
 	//SetCurveToEdit(FName CurveName)
 
-	FTODOnPropertySelected OnPropertySelected = FTODOnPropertySelected::CreateSP(this, &FTODAssetEditor::SetCurveToEdit);
 
 	FTODOnGetSelectedFloatCurveName OnGetSelectedFloatCurveName;
 
+
+	FTODOnPropertySelected OnPropertySelected = FTODOnPropertySelected::CreateSP(this, &FTODAssetEditor::SetCurveToEdit);
+	FTODOnFloatCurveValueChanged OnFloatCurveValueChanged = FTODOnFloatCurveValueChanged::CreateSP(this, &FTODAssetEditor::UpdateFloatCurve);
+	FTODOnColorCurveValueChanged OnColorCurveValueChanged = FTODOnColorCurveValueChanged::CreateSP(this, &FTODAssetEditor::UpdateColorCurve);
+	PropertyDetailsView = PropertyEditorModule.CreateDetailView(DetailViewArgs);
+	FOnGetDetailCustomizationInstance PropertyDetailsLayoutView = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetPropertyDetails::MakeInstance, OnPropertySelected, OnFloatCurveValueChanged, OnColorCurveValueChanged);
+	PropertyDetailsView->RegisterInstancedCustomPropertyLayout(UTODAsset::StaticClass(), PropertyDetailsLayoutView);
+	PropertyDetailsView->SetObject(ItemIn);
+
+
 	FOnGetCurrentProperty OnGetCurrentProperty = FOnGetCurrentProperty::CreateSP(this, &FTODAssetEditor::GetCurrentProperty);
-	
+
 	FOnGetDetailCustomizationInstance LayoutVariableDetails = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetDetails::MakeInstance, OnGetCurrentProperty);
 	ItemDetailsView->RegisterInstancedCustomPropertyLayout(UTODAsset::StaticClass(), LayoutVariableDetails);
 	ItemDetailsView->SetObject(ItemIn);
 
-	PropertyDetailsView = PropertyEditorModule.CreateDetailView(DetailViewArgs);
-	FOnGetDetailCustomizationInstance PropertyDetailsLayoutView = FOnGetDetailCustomizationInstance::CreateStatic(&FTODAssetPropertyDetails::MakeInstance, OnPropertySelected);
-	PropertyDetailsView->RegisterInstancedCustomPropertyLayout(UTODAsset::StaticClass(), PropertyDetailsLayoutView);
-	PropertyDetailsView->SetObject(ItemIn);
-	
-	
+
 	const TSharedRef<FTabManager::FLayout> TimeOfDayEditorDefault = FTabManager::NewLayout("Standalone_ItemEditor")
 		->AddArea
 		(
@@ -278,6 +282,23 @@ bool FTODAssetEditor::HasAnyAlphaKeys() const
 }
 /* FCurveOwnerInterface End **/
 
+void FTODAssetEditor::UpdateFloatCurve(float ValueIn)
+{
+	if (SelectedFloatCurve)
+	{
+		SelectedFloatCurve->EditorCurveData.UpdateOrAddKey(EditedItemAsset->Hour, ValueIn);
+	}
+}
+void FTODAssetEditor::UpdateColorCurve(FLinearColor ValueIn)
+{
+	if (SelectedColorCurve)
+	{
+		SelectedColorCurve->ColorCurves[0].UpdateOrAddKey(EditedItemAsset->Hour, ValueIn.R);
+		SelectedColorCurve->ColorCurves[1].UpdateOrAddKey(EditedItemAsset->Hour, ValueIn.G);
+		SelectedColorCurve->ColorCurves[2].UpdateOrAddKey(EditedItemAsset->Hour, ValueIn.B);
+		SelectedColorCurve->ColorCurves[3].UpdateOrAddKey(EditedItemAsset->Hour, ValueIn.A);
+	}
+}
 void FTODAssetEditor::SetCurveToEdit(UProperty* CurveProp)
 {
 	//reset pointers coz, we can have only one curve active at time.

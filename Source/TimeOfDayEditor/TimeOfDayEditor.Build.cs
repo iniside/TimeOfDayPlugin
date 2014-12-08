@@ -54,7 +54,8 @@ namespace UnrealBuildTool.Rules
                     "ClassViewer",
                     "AssetRegistry",
                     "ActorPickerMode",
-                    "DetailCustomizations"
+                    "DetailCustomizations",
+                    "AppFramework"
 				}
 				);
 

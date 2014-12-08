@@ -38,11 +38,21 @@ float FTODFloatCurveProperty::GetFloatValueFromAttribute() const
 {
 	return GetFloatAttribute.Get();
 }
+
+void FTODFloatCurveProperty::OnFloatValueChanged(float ValueIn)
+{
+	if (OnFloatCurveValueChanged.IsBound())
+	{
+		OnFloatCurveValueChanged.Execute(ValueIn);
+	}
+}
 void FTODFloatCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBuilder)
 {
 	CategoryBuilder.AddCustomRow(FString("Test Row"))
 		[
 			SNew(SButton)
+			.ForegroundColor(FSlateColor::UseForeground())
+			.ButtonStyle(FEditorStyle::Get(), "HoverHintOnly")
 			.OnClicked(this, &FTODFloatCurveProperty::HandleOnButtonClicked, PropertyHandle)
 			[
 				SNew(SProperty, PropertyHandle)
@@ -55,9 +65,13 @@ void FTODFloatCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBui
 						+ SVerticalBox::Slot()
 							[
 								SNew(SSpinBox<float>)
+								.Delta(0.2)
+								.MinValue(0)
+								.MaxValue(1024)
 								.MinSliderValue(0)
 								.MaxSliderValue(1024)
 								.Value(TAttribute<float>(this, &FTODFloatCurveProperty::GetFloatValueFromAttribute))
+								.OnValueChanged(this, &FTODFloatCurveProperty::OnFloatValueChanged)
 							]
 					]
 				]
@@ -68,6 +82,7 @@ void FTODFloatCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBui
 
 FLinearColor FTODColorCurveProperty::GetCurrentColorValue() const
 {
+	FLinearColor returnColor = FLinearColor(0, 0, 0, 0);
 	if (PropertyHandle.IsValid())
 	{
 		UProperty* propPtr = PropertyHandle->GetProperty();
@@ -75,13 +90,14 @@ FLinearColor FTODColorCurveProperty::GetCurrentColorValue() const
 		if (structProp)
 		{
 			FRuntimeCurveLinearColor* colorCurve = structProp->ContainerPtrToValuePtr<FRuntimeCurveLinearColor>(TODAsset);
-			if (colorCurve)
+			if (colorCurve && colorCurve->IsOfType(FRuntimeCurveLinearColor::CurveTypeID))
 			{
-				return colorCurve->GetLinearColorValue(TODAsset->Hour);
+				returnColor = colorCurve->GetLinearColorValue(TODAsset->Hour);
+				return returnColor;
 			}
 		}
 	}
-	return FLinearColor(0,0,0,0);
+	return returnColor;
 }
 
 FReply FTODColorCurveProperty::HandleOnButtonClicked(TSharedPtr<IPropertyHandle> PropertyHandle)
@@ -90,7 +106,6 @@ FReply FTODColorCurveProperty::HandleOnButtonClicked(TSharedPtr<IPropertyHandle>
 	{
 		if (PropertyHandle.IsValid())
 		{
-			FName test = PropertyHandle->GetProperty()->GetFName();
 			OnPropertySelected.Execute(PropertyHandle->GetProperty());
 		}
 	}
@@ -100,11 +115,41 @@ FLinearColor FTODColorCurveProperty::GetColorValueFromAttribute() const
 {
 	return GetColorAttribute.Get();
 }
+
+void FTODColorCurveProperty::ColorPicker_OnColorCommitted(FLinearColor InColor)
+{
+	if (OnColorCurveValueChanged.IsBound())
+	{
+		OnColorCurveValueChanged.Execute(InColor);
+	}
+}
+
+FReply FTODColorCurveProperty::ColorBlock_OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
+{
+	if (MouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		FLinearColor currentColor = GetColorAttribute.Get();
+		FColorPickerArgs ColorPickerArgs;
+		TArray<FLinearColor*> LinearColorArray;
+		LinearColorArray.Add(&currentColor);
+		ColorPickerArgs.LinearColorArray = &LinearColorArray;
+		ColorPickerArgs.OnColorCommitted = FOnLinearColorValueChanged::CreateSP(this, &FTODColorCurveProperty::ColorPicker_OnColorCommitted);
+
+		OpenColorPicker(ColorPickerArgs);
+
+		return FReply::Handled();
+	}
+
+	return FReply::Unhandled();
+}
+
 void FTODColorCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBuilder)
 {
 	CategoryBuilder.AddCustomRow(FString("Test Row"))
 		[
 			SNew(SButton)
+			.ForegroundColor(FSlateColor::UseForeground())
+			.ButtonStyle(FEditorStyle::Get(), "HoverHintOnly")
 			.OnClicked(this, &FTODColorCurveProperty::HandleOnButtonClicked, PropertyHandle)
 			[
 				SNew(SProperty, PropertyHandle)
@@ -120,6 +165,7 @@ void FTODColorCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBui
 							.UseSRGB(true)
 							.ColorIsHSV(false)
 							.Color(TAttribute<FLinearColor>(this, &FTODColorCurveProperty::GetColorValueFromAttribute))
+							.OnMouseButtonDown(this, &FTODColorCurveProperty::ColorBlock_OnMouseButtonDown)
 						]
 					]
 				]
@@ -129,9 +175,9 @@ void FTODColorCurveProperty::ConstructWidget(IDetailCategoryBuilder& CategoryBui
 
 
 
-TSharedRef<IDetailCustomization> FTODAssetPropertyDetails::MakeInstance(FTODOnPropertySelected OnPropertySelectedIn)
+TSharedRef<IDetailCustomization> FTODAssetPropertyDetails::MakeInstance(FTODOnPropertySelected OnPropertySelectedIn, FTODOnFloatCurveValueChanged OnFloatCurveValueChangedIn, FTODOnColorCurveValueChanged OnColorCurveValueChangedIn)
 {
-	return MakeShareable(new FTODAssetPropertyDetails(OnPropertySelectedIn));
+	return MakeShareable(new FTODAssetPropertyDetails(OnPropertySelectedIn, OnFloatCurveValueChangedIn, OnColorCurveValueChangedIn));
 }
 
 FTODAssetPropertyDetails::~FTODAssetPropertyDetails()
@@ -171,6 +217,7 @@ void FTODAssetPropertyDetails::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 				{
 					TSharedPtr<FTODFloatCurveProperty> tempFloatProp = MakeShareable(new FTODFloatCurveProperty());
 					tempFloatProp->OnPropertySelected = OnPropertySelected;
+					tempFloatProp->OnFloatCurveValueChanged = OnFloatCurveValueChanged;
 					tempFloatProp->PropertyHandle = DetailLayout.GetProperty(prop->GetFName());
 					tempFloatProp->TODAsset = TODAsset;
 					tempFloatProp->CategoryName = tempFloatProp->PropertyHandle->GetMetaData(TEXT("Category"));
@@ -191,6 +238,7 @@ void FTODAssetPropertyDetails::CustomizeDetails(IDetailLayoutBuilder& DetailLayo
 				{
 					TSharedPtr<FTODColorCurveProperty> tempColorProp = MakeShareable(new FTODColorCurveProperty());
 					tempColorProp->OnPropertySelected = OnPropertySelected;
+					tempColorProp->OnColorCurveValueChanged = OnColorCurveValueChanged;
 					tempColorProp->PropertyHandle = DetailLayout.GetProperty(prop->GetFName());
 					tempColorProp->TODAsset = TODAsset;
 					tempColorProp->CategoryName = tempColorProp->PropertyHandle->GetMetaData(TEXT("Category"));

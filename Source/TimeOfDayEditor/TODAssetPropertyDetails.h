@@ -2,11 +2,18 @@
 #include "PropertyEditing.h"
 #include "PropertyCustomizationHelpers.h"
 #include "AssetTypeActions_Base.h"
+
+#include "SColorPicker.h"
+
 #include "Editor/PropertyEditor/Public/IDetailCustomNodeBuilder.h"
 
 DECLARE_DELEGATE_RetVal(FName, FTODOnGetSelectedFloatCurveName);
 
 DECLARE_DELEGATE_OneParam(FTODOnPropertySelected, UProperty*);
+
+DECLARE_DELEGATE_OneParam(FTODOnFloatCurveValueChanged, float);
+
+DECLARE_DELEGATE_OneParam(FTODOnColorCurveValueChanged, FLinearColor);
 
 /*
 	Customization for curve property display.
@@ -37,7 +44,7 @@ class FTODFloatCurveProperty : public FTODProperty, public TSharedFromThis<FTODF
 {
 public:
 	FTODOnPropertySelected OnPropertySelected;
-	//FRuntimeFloatCurve* FloatCurve;
+	FTODOnFloatCurveValueChanged OnFloatCurveValueChanged;
 
 	float GetCurrentFloatValue() const;
 
@@ -47,6 +54,8 @@ public:
 	void ConstructWidget(IDetailCategoryBuilder& CategoryBuilder);
 
 	FReply HandleOnButtonClicked(TSharedPtr<IPropertyHandle> PropertyHandle);
+
+	void OnFloatValueChanged(float ValueIn);
 	FTODFloatCurveProperty()
 	{
 
@@ -67,6 +76,7 @@ class FTODColorCurveProperty : public FTODProperty, public TSharedFromThis<FTODC
 {
 public:
 	FTODOnPropertySelected OnPropertySelected;
+	FTODOnColorCurveValueChanged OnColorCurveValueChanged;
 	FLinearColor GetCurrentColorValue() const;
 
 	FLinearColor GetColorValueFromAttribute() const;
@@ -74,6 +84,10 @@ public:
 	void ConstructWidget(IDetailCategoryBuilder& CategoryBuilder);
 
 	FReply HandleOnButtonClicked(TSharedPtr<IPropertyHandle> PropertyHandle);
+	FReply ColorBlock_OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent);
+
+	void ColorPicker_OnColorCommitted(FLinearColor InColor);
+
 	FTODColorCurveProperty()
 	{
 
@@ -95,12 +109,16 @@ public:
 class FTODAssetPropertyDetails : public IDetailCustomization
 {
 public:
-	FTODAssetPropertyDetails(FTODOnPropertySelected OnPropertySelectedIn)
-		: OnPropertySelected(OnPropertySelectedIn)
+	FTODAssetPropertyDetails(FTODOnPropertySelected OnPropertySelectedIn, FTODOnFloatCurveValueChanged OnFloatCurveValueChangedIn
+		, FTODOnColorCurveValueChanged OnColorCurveValueChangedIn)
+		: OnPropertySelected(OnPropertySelectedIn),
+		OnFloatCurveValueChanged(OnFloatCurveValueChangedIn),
+		OnColorCurveValueChanged(OnColorCurveValueChangedIn)
 	{};
 	~FTODAssetPropertyDetails();
 	/** Makes a new instance of this detail layout class for a specific detail view requesting it */
-	static TSharedRef<IDetailCustomization> MakeInstance(FTODOnPropertySelected OnPropertySelectedIn);
+	static TSharedRef<IDetailCustomization> MakeInstance(FTODOnPropertySelected OnPropertySelectedIn, FTODOnFloatCurveValueChanged OnFloatCurveValueChangedIn
+		, FTODOnColorCurveValueChanged OnColorCurveValueChangedIn);
 
 	/** IDetailCustomization interface */
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailLayout) override;
@@ -108,6 +126,11 @@ public:
 protected:
 	FTODOnGetSelectedFloatCurveName OnGetSelectedFloatCurveName;
 	FTODOnPropertySelected OnPropertySelected;
+
+	FTODOnFloatCurveValueChanged OnFloatCurveValueChanged;
+
+	FTODOnColorCurveValueChanged OnColorCurveValueChanged;
+
 	TArray<TSharedPtr<IPropertyHandle>> PropertyHandles;
 
 	TArray<TSharedPtr<FTODFloatCurveProperty>> FloatCurves;

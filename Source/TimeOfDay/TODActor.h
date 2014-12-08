@@ -5,6 +5,17 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDMDOnSunset);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDMDOnSunrise);
+
+//Delegates for rain
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTODOnRainStart);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTODOnRainEnd);
+
+//Delegates for snow
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTODOnSnowStart);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTODOnSnowEnd);
+
+//General delegate indicating if weather changed, but do not indicate how.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTODOnOnWeatherChanged);
 /**
  * The public interface to this module.  In most cases, this interface is only public to sibling modules 
  * within this plugin.

@@ -88,6 +88,9 @@ protected:
 	FText GetCurrentCurveName() const;
 	FName GetCurrentProperty();
 
+	void UpdateFloatCurve(float ValueIn);
+	void UpdateColorCurve(FLinearColor ValueIn);
+
 	void SetCurveToEdit(UProperty* CurveProp);
 private:
 	/**	The tab id for the curve table tab */
